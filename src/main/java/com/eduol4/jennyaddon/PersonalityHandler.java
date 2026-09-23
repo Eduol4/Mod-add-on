@@ -7,6 +7,7 @@ import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.goal.GoalSelector;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
+import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.ai.goal.WrappedGoal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
@@ -25,20 +26,26 @@ import java.util.Map;
  * Cerebro do add-on. Reconhece a Jenny pelo identificador, sorteia a personalidade
  * (persistida na propria entidade), reconfigura as metas de IA das passivas e cuida
  * da virada para hostil (ao apanhar do jogador) e da volta a calma.
+ *
+ * Velocidades (relativas ao "normal" 0.85 que o mod usa ao perseguir):
+ *   - atacar (quando provocada)  = 0.85  (normal)
+ *   - seguir passivamente        = 0.64  (0.75 x normal)
+ *   - vagar sem alvo             = 0.43  (0.5 x normal)
  */
 @Mod.EventBusSubscriber(modid = JennyAddon.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class PersonalityHandler {
 
     private static final ResourceLocation JENNY_ID = new ResourceLocation("jenny_dweller", "jenny_dweller");
 
-    // Guardados no espaco de dados persistente da entidade (salva/carrega sozinho).
     private static final String TAG_ASSIGNED = "JennyAddonAssigned";
     private static final String TAG_PASSIVE  = "JennyAddonPassive";
 
-    // ~25 segundos (20 ticks por segundo) sem apanhar -> volta a ser passiva.
-    private static final int PROVOKE_TICKS = 500;
+    private static final int PROVOKE_TICKS = 500; // ~25 s sem apanhar -> volta a ser passiva
 
-    // id da entidade -> ticks restantes de "provocada". Estado de tempo de execucao (nao precisa persistir).
+    // Modificadores de velocidade por comportamento.
+    private static final double SPEED_ATTACK = 0.85D; // normal
+    private static final double SPEED_WANDER = 0.43D; // 0.5 x normal
+
     private static final Map<Integer, Integer> provoked = new HashMap<>();
 
     private PersonalityHandler() {}
@@ -60,8 +67,7 @@ public final class PersonalityHandler {
 
         CompoundTag data = ent.getPersistentData();
         if (!data.contains(TAG_ASSIGNED)) {
-            // Sorteio unico por criatura: 80% passiva, 20% normal.
-            boolean passive = mob.getRandom().nextInt(5) < 4;
+            boolean passive = mob.getRandom().nextInt(5) < 4; // 80% passiva, 20% normal
             data.putBoolean(TAG_PASSIVE, passive);
             data.putBoolean(TAG_ASSIGNED, true);
         }
@@ -69,24 +75,28 @@ public final class PersonalityHandler {
         if (data.getBoolean(TAG_PASSIVE)) {
             configurePassive(mob);
         }
-        // Personalidade "normal": nao mexemos em nada; a IA padrao do mod roda intacta.
     }
 
     private static void configurePassive(PathfinderMob mob) {
-        // Sem stare, sem fuga, e sem a perseguicao-com-ataque padrao dela.
+        // Sem stare, sem fuga, sem a perseguicao padrao, e sem o "vagar" original dela.
         removeGoalsByName(mob.goalSelector,
-                "JennyDwellerStareGoal", "JennyDwellerFleeGoal", "JennyDwellerChaseGoal");
+                "JennyDwellerStareGoal", "JennyDwellerFleeGoal",
+                "JennyDwellerChaseGoal", "JennyDwellerStrollGoal");
         // Nao e proativamente hostil: remove as metas que a fazem mirar o jogador sozinha.
         removeGoalsByName(mob.targetSelector,
                 "JennyDwellerTargetSeesMeGoal", "JennyDwellerTargetTooCloseGoal");
 
-        // Seguir pacificamente (prioridade 2, acima do "vagar" que e 3).
+        // Ataque (so age quando ela tiver um alvo, ou seja, quando provocada) na velocidade normal.
+        if (!hasGoalByName(mob.goalSelector, "MeleeAttackGoal")) {
+            mob.goalSelector.addGoal(1, new MeleeAttackGoal(mob, SPEED_ATTACK, true));
+        }
+        // Seguir pacificamente, mantendo distancia (a 0.75 x normal; ver PassiveFollowGoal).
         if (!hasGoalByName(mob.goalSelector, "PassiveFollowGoal")) {
             mob.goalSelector.addGoal(2, new PassiveFollowGoal(mob));
         }
-        // Ataque so entra em acao quando ela tiver um alvo (ou seja, quando provocada).
-        if (!hasGoalByName(mob.goalSelector, "MeleeAttackGoal")) {
-            mob.goalSelector.addGoal(1, new MeleeAttackGoal(mob, 1.2D, true));
+        // Vagar devagar quando nao ha jogador por perto (0.5 x normal).
+        if (!hasGoalByName(mob.goalSelector, "WaterAvoidingRandomStrollGoal")) {
+            mob.goalSelector.addGoal(4, new WaterAvoidingRandomStrollGoal(mob, SPEED_WANDER));
         }
         // Mantida: CustomHurtByTargetGoal -> ao apanhar, ela mira quem a atacou.
     }
@@ -101,7 +111,6 @@ public final class PersonalityHandler {
             return;
         }
         if (event.getSource().getEntity() instanceof Player) {
-            // Provoca (ou renova o cronometro). A meta "revidar" ja define o alvo automaticamente.
             provoked.put(victim.getId(), PROVOKE_TICKS);
         }
     }
