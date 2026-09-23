@@ -1,0 +1,33 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="All Rights Reserved"
+
+[[mods]]
+modId="jennyaddon"
+version="1.0.0"
+displayName="Jenny Dweller Add-on"
+authors="eduol4"
+description='''
+Adiciona personalidade por spawn a Jenny Dweller: 80% passiva (segue o jogador a certa distancia, sem atacar, sem stare, sem fuga) e 20% normal. Uma Jenny passiva atacada por um jogador vira hostil e se defende, voltando a ser passiva alguns segundos apos o ultimo golpe.
+'''
+
+[[dependencies.jennyaddon]]
+    modId="forge"
+    mandatory=true
+    versionRange="[47,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.jennyaddon]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.20.1,1.20.2)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.jennyaddon]]
+    modId="jenny_dweller"
+    mandatory=true
+    versionRange="[1.8,)"
+    ordering="AFTER"
+    side="BOTH"
