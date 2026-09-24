@@ -1,0 +1,15 @@
+{
+    "required": true,
+    "minVersion": "0.8",
+    "package": "com.eduol4.jennyaddon.mixin",
+    "compatibilityLevel": "JAVA_17",
+    "refmap": "jennyaddon.refmap.json",
+    "mixins": [
+        "MonsterMixin"
+    ],
+    "client": [],
+    "server": [],
+    "injectors": {
+        "defaultRequire": 1
+    }
+}
