@@ -8,17 +8,20 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.goal.GoalSelector;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.ai.goal.WrappedGoal;
+import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
@@ -32,8 +35,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Cerebro do add-on: personalidade por spawn, reconfiguracao de IA das passivas,
- * virada para hostil ao apanhar, e domesticacao (versao passiva).
+ * Cerebro do add-on: personalidade por spawn, IA das passivas, virada para hostil ao apanhar,
+ * domesticacao (versao passiva), imunidade do dono e Golems ignorando a domada.
  */
 @Mod.EventBusSubscriber(modid = JennyAddon.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class PersonalityHandler {
@@ -89,7 +92,7 @@ public final class PersonalityHandler {
             configurePassive(mob);
         }
         if (data.getBoolean(JennyAddon.TAG_TAMED)) {
-            mob.setPersistenceRequired(); // domesticada nunca desaparece (reforca ao carregar)
+            mob.setPersistenceRequired();
         }
     }
 
@@ -101,7 +104,7 @@ public final class PersonalityHandler {
                 "JennyDwellerTargetSeesMeGoal", "JennyDwellerTargetTooCloseGoal");
 
         if (!hasGoalByName(mob.goalSelector, "SitGoal")) {
-            mob.goalSelector.addGoal(0, new SitGoal(mob)); // sentar tem prioridade maxima
+            mob.goalSelector.addGoal(0, new SitGoal(mob));
         }
         if (!hasGoalByName(mob.goalSelector, "MeleeAttackGoal")) {
             mob.goalSelector.addGoal(1, new MeleeAttackGoal(mob, SPEED_ATTACK, true));
@@ -117,7 +120,7 @@ public final class PersonalityHandler {
     @SubscribeEvent
     public static void onInteract(PlayerInteractEvent.EntityInteract event) {
         if (event.getHand() != InteractionHand.MAIN_HAND) {
-            return; // processa so a mao principal (evita disparo duplo)
+            return;
         }
         Entity target = event.getTarget();
         if (!isJenny(target) || !(target instanceof PathfinderMob mob)) {
@@ -125,7 +128,7 @@ public final class PersonalityHandler {
         }
         CompoundTag data = target.getPersistentData();
         if (!data.getBoolean(JennyAddon.TAG_PASSIVE)) {
-            return; // por enquanto, so a passiva e domesticavel
+            return;
         }
         Player player = event.getEntity();
 
@@ -146,13 +149,13 @@ public final class PersonalityHandler {
         ItemStack held = event.getItemStack();
         Double chance = TAME_ITEMS.get(held.getItem());
         if (chance == null) {
-            return; // item nao serve para domesticar
+            return;
         }
 
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
         if (target.level().isClientSide()) {
-            return; // logica e particulas so no servidor
+            return;
         }
 
         if (!player.getAbilities().instabuild) {
@@ -178,11 +181,45 @@ public final class PersonalityHandler {
         if (victim.level().isClientSide() || !isJenny(victim)) {
             return;
         }
-        if (!victim.getPersistentData().getBoolean(JennyAddon.TAG_PASSIVE)) {
+        CompoundTag data = victim.getPersistentData();
+        if (!data.getBoolean(JennyAddon.TAG_PASSIVE)) {
             return;
         }
-        if (event.getSource().getEntity() instanceof Player) {
+        Entity attacker = event.getSource().getEntity();
+        if (attacker instanceof Player attackerPlayer) {
+            // A domada nunca fica hostil com o proprio dono.
+            if (data.getBoolean(JennyAddon.TAG_TAMED) && isOwner(data, attackerPlayer)) {
+                return;
+            }
             provoked.put(victim.getId(), PROVOKE_TICKS);
+        }
+    }
+
+    /**
+     * Bloqueia miras indesejadas: a domada nunca mira o dono, e Golems de ferro nunca miram a domada.
+     */
+    @SubscribeEvent
+    public static void onChangeTarget(LivingChangeTargetEvent event) {
+        LivingEntity mob = event.getEntity();
+        LivingEntity newTarget = event.getNewAboutToBeSetTarget();
+        if (newTarget == null) {
+            return;
+        }
+
+        if (isJenny(mob)) {
+            CompoundTag data = mob.getPersistentData();
+            if (data.getBoolean(JennyAddon.TAG_TAMED)
+                    && newTarget instanceof Player targetPlayer
+                    && isOwner(data, targetPlayer)) {
+                event.setCanceled(true); // dono e intocavel
+                return;
+            }
+        }
+
+        if (mob instanceof IronGolem
+                && isJenny(newTarget)
+                && newTarget.getPersistentData().getBoolean(JennyAddon.TAG_TAMED)) {
+            event.setCanceled(true); // Golem nao ataca Jenny domada
         }
     }
 
