@@ -6,7 +6,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import java.util.EnumSet;
 
 /**
- * Quando a Jenny domesticada esta "sentada", ela fica parada no lugar.
+ * Quando a Jenny domesticada esta "sentada", ela fica parada e exibe a animacao de agachar.
  * Cede a vez se ela tiver um alvo (ou seja, se for atacada, ela levanta para se defender).
  */
 public class SitGoal extends Goal {
@@ -33,6 +33,12 @@ public class SitGoal extends Goal {
     @Override
     public void start() {
         this.mob.getNavigation().stop();
+        JennyCompat.setCrouching(this.mob, true); // pose de agachar simboliza "sentada"
+    }
+
+    @Override
+    public void stop() {
+        JennyCompat.setCrouching(this.mob, false);
     }
 
     @Override
