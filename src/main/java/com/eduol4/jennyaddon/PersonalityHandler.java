@@ -201,7 +201,7 @@ public final class PersonalityHandler {
     @SubscribeEvent
     public static void onChangeTarget(LivingChangeTargetEvent event) {
         LivingEntity mob = event.getEntity();
-        LivingEntity newTarget = event.getNewAboutToBeSetTarget();
+        LivingEntity newTarget = event.getNewTarget();
         if (newTarget == null) {
             return;
         }
