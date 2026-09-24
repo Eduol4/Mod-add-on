@@ -13,10 +13,10 @@ import java.util.EnumSet;
  */
 public class PassiveFollowGoal extends Goal {
 
-    private static final double SEARCH_RADIUS = 24.0D;      // ate onde ela "detecta" o jogador
+    private static final double SEARCH_RADIUS = 32.0D;      // ate onde ela "detecta" o jogador
     private static final double SPEED = 0.64D;              // 0.75 x a velocidade normal (0.85)
-    private static final float  STOP_DISTANCE = 6.0F;       // para de se aproximar a 6 blocos
-    private static final double GIVE_UP_DISTANCE_SQR = 32.0D * 32.0D; // desiste se ficar longe demais
+    private static final float  STOP_DISTANCE = 18.0F;      // para de se aproximar a 18 blocos (a "folga")
+    private static final double GIVE_UP_DISTANCE_SQR = 40.0D * 40.0D; // desiste se ficar longe demais
 
     private final PathfinderMob mob;
     private Player following;
