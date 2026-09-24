@@ -8,7 +8,7 @@ version="1.0.0"
 displayName="Jenny Dweller Add-on"
 authors="eduol4"
 description='''
-Adiciona personalidade por spawn a Jenny Dweller: 80% passiva (segue o jogador a certa distancia, sem atacar, sem stare, sem fuga) e 20% normal. Uma Jenny passiva atacada por um jogador vira hostil e se defende, voltando a ser passiva alguns segundos apos o ultimo golpe.
+Add-on para o mod Jenny Dweller: personalidade por spawn, domesticacao da versao passiva, e comportamentos de animal de estimacao.
 '''
 
 [[dependencies.jennyaddon]]
@@ -31,3 +31,6 @@ Adiciona personalidade por spawn a Jenny Dweller: 80% passiva (segue o jogador a
     versionRange="[1.8,)"
     ordering="AFTER"
     side="BOTH"
+
+[[mixins]]
+config="jennyaddon.mixins.json"
