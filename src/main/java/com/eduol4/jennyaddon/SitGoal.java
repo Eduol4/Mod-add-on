@@ -8,6 +8,9 @@ import java.util.EnumSet;
 /**
  * Quando a Jenny domesticada esta "sentada", ela fica parada e exibe a animacao de agachar.
  * Cede a vez se ela tiver um alvo (ou seja, se for atacada, ela levanta para se defender).
+ *
+ * A flag de agachar e reforcada a cada tick porque o proprio mod a reescreve todo tick;
+ * como a IA roda depois dessa escrita, o nosso set no tick() e o ultimo do tick e prevalece.
  */
 public class SitGoal extends Goal {
 
@@ -33,7 +36,7 @@ public class SitGoal extends Goal {
     @Override
     public void start() {
         this.mob.getNavigation().stop();
-        JennyCompat.setCrouching(this.mob, true); // pose de agachar simboliza "sentada"
+        JennyCompat.setCrouching(this.mob, true);
     }
 
     @Override
@@ -42,7 +45,13 @@ public class SitGoal extends Goal {
     }
 
     @Override
+    public boolean requiresUpdateEveryTick() {
+        return true;
+    }
+
+    @Override
     public void tick() {
         this.mob.getNavigation().stop();
+        JennyCompat.setCrouching(this.mob, true); // reforca a cada tick para vencer a escrita do mod
     }
 }
