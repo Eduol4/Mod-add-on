@@ -9,6 +9,10 @@ import java.lang.reflect.Field;
  * Ponte para acionar a animacao interna de "agachar" da Jenny.
  * A flag CROUCHING_ACCESSOR e public static no mod; usamos reflexao para aciona-la
  * sem precisar compilar o add-on contra o jar da Jenny.
+ *
+ * Observacao: setamos apenas a flag (sem refreshDimensions). O mod reescreve essa flag
+ * a cada tick, entao a meta de sentar precisa chama-la a cada tick para vencer a disputa;
+ * mexer na hitbox nesse embate faria ela "piscar" de tamanho, e para a animacao basta a flag.
  */
 public final class JennyCompat {
 
@@ -27,7 +31,7 @@ public final class JennyCompat {
             Field f = cls.getField("CROUCHING_ACCESSOR");
             crouchingAccessor = f.get(null);
         } catch (Throwable t) {
-            crouchingAccessor = null; // se falhar, a mecanica de sentar ainda funciona, so sem a pose
+            crouchingAccessor = null; // se falhar, sentar ainda funciona, so sem a pose
         }
     }
 
@@ -39,7 +43,6 @@ public final class JennyCompat {
         }
         try {
             mob.getEntityData().set((EntityDataAccessor<Boolean>) crouchingAccessor, value);
-            mob.refreshDimensions();
         } catch (Throwable ignored) {
         }
     }
