@@ -50,11 +50,13 @@ public final class PersonalityHandler {
     // Itens de domesticacao -> taxa de sucesso.
     private static final Map<Item, Double> TAME_ITEMS = new HashMap<>();
     static {
-        TAME_ITEMS.put(Items.CAKE, 1.00D);          // Bolo
-        TAME_ITEMS.put(Items.PUMPKIN_PIE, 0.75D);   // Torta de abobora
-        TAME_ITEMS.put(Items.COOKIE, 0.55D);        // Biscoito
-        TAME_ITEMS.put(Items.GLOW_BERRIES, 0.50D);  // Bagas douradas (glow berries)
-        TAME_ITEMS.put(Items.SWEET_BERRIES, 0.25D); // Bagas doces (sweet berries)
+        TAME_ITEMS.put(Items.CAKE, 1.000D);         // Bolo
+        TAME_ITEMS.put(Items.PUMPKIN_PIE, 0.750D);  // Torta de abobora
+        TAME_ITEMS.put(Items.COOKIE, 0.300D);       // Biscoito
+        TAME_ITEMS.put(Items.GLOW_BERRIES, 0.250D); // Bagas douradas (glow berries)
+        TAME_ITEMS.put(Items.SWEET_BERRIES, 0.125D);// Bagas doces (sweet berries)
+        TAME_ITEMS.put(Items.HONEYCOMB, 0.200D);    // Favo de mel
+        TAME_ITEMS.put(Items.HONEY_BOTTLE, 0.200D); // Garrafa de mel
     }
 
     private static final Map<Integer, Integer> provoked = new HashMap<>();
