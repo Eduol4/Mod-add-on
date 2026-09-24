@@ -1,7 +1,12 @@
 package com.eduol4.jennyaddon;
 
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -10,9 +15,13 @@ import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.ai.goal.WrappedGoal;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -23,14 +32,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Cerebro do add-on. Reconhece a Jenny pelo identificador, sorteia a personalidade
- * (persistida na propria entidade), reconfigura as metas de IA das passivas e cuida
- * da virada para hostil (ao apanhar do jogador) e da volta a calma.
- *
- * Velocidades (relativas ao "normal" 0.85 que o mod usa ao perseguir):
- *   - atacar (quando provocada)  = 0.85  (normal)
- *   - seguir passivamente        = 0.64  (0.75 x normal)
- *   - vagar sem alvo             = 0.43  (0.5 x normal)
+ * Cerebro do add-on: personalidade por spawn, reconfiguracao de IA das passivas,
+ * virada para hostil ao apanhar, e domesticacao (versao passiva).
  */
 @Mod.EventBusSubscriber(modid = JennyAddon.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class PersonalityHandler {
@@ -38,13 +41,21 @@ public final class PersonalityHandler {
     private static final ResourceLocation JENNY_ID = new ResourceLocation("jenny_dweller", "jenny_dweller");
 
     private static final String TAG_ASSIGNED = "JennyAddonAssigned";
-    private static final String TAG_PASSIVE  = "JennyAddonPassive";
 
-    private static final int PROVOKE_TICKS = 500; // ~25 s sem apanhar -> volta a ser passiva
+    private static final int PROVOKE_TICKS = 500; // ~25 s
 
-    // Modificadores de velocidade por comportamento.
     private static final double SPEED_ATTACK = 0.85D; // normal
     private static final double SPEED_WANDER = 0.43D; // 0.5 x normal
+
+    // Itens de domesticacao -> taxa de sucesso.
+    private static final Map<Item, Double> TAME_ITEMS = new HashMap<>();
+    static {
+        TAME_ITEMS.put(Items.CAKE, 1.00D);          // Bolo
+        TAME_ITEMS.put(Items.PUMPKIN_PIE, 0.75D);   // Torta de abobora
+        TAME_ITEMS.put(Items.COOKIE, 0.55D);        // Biscoito
+        TAME_ITEMS.put(Items.GLOW_BERRIES, 0.50D);  // Bagas douradas (glow berries)
+        TAME_ITEMS.put(Items.SWEET_BERRIES, 0.25D); // Bagas doces (sweet berries)
+    }
 
     private static final Map<Integer, Integer> provoked = new HashMap<>();
 
@@ -67,38 +78,96 @@ public final class PersonalityHandler {
 
         CompoundTag data = ent.getPersistentData();
         if (!data.contains(TAG_ASSIGNED)) {
-            boolean passive = mob.getRandom().nextInt(5) < 4; // 80% passiva, 20% normal
-            data.putBoolean(TAG_PASSIVE, passive);
+            boolean passive = mob.getRandom().nextInt(5) < 4; // 80% passiva
+            data.putBoolean(JennyAddon.TAG_PASSIVE, passive);
             data.putBoolean(TAG_ASSIGNED, true);
         }
 
-        if (data.getBoolean(TAG_PASSIVE)) {
+        if (data.getBoolean(JennyAddon.TAG_PASSIVE)) {
             configurePassive(mob);
+        }
+        if (data.getBoolean(JennyAddon.TAG_TAMED)) {
+            mob.setPersistenceRequired(); // domesticada nunca desaparece (reforca ao carregar)
         }
     }
 
     private static void configurePassive(PathfinderMob mob) {
-        // Sem stare, sem fuga, sem a perseguicao padrao, e sem o "vagar" original dela.
         removeGoalsByName(mob.goalSelector,
                 "JennyDwellerStareGoal", "JennyDwellerFleeGoal",
                 "JennyDwellerChaseGoal", "JennyDwellerStrollGoal");
-        // Nao e proativamente hostil: remove as metas que a fazem mirar o jogador sozinha.
         removeGoalsByName(mob.targetSelector,
                 "JennyDwellerTargetSeesMeGoal", "JennyDwellerTargetTooCloseGoal");
 
-        // Ataque (so age quando ela tiver um alvo, ou seja, quando provocada) na velocidade normal.
+        if (!hasGoalByName(mob.goalSelector, "SitGoal")) {
+            mob.goalSelector.addGoal(0, new SitGoal(mob)); // sentar tem prioridade maxima
+        }
         if (!hasGoalByName(mob.goalSelector, "MeleeAttackGoal")) {
             mob.goalSelector.addGoal(1, new MeleeAttackGoal(mob, SPEED_ATTACK, true));
         }
-        // Seguir pacificamente, mantendo distancia (a 0.75 x normal; ver PassiveFollowGoal).
         if (!hasGoalByName(mob.goalSelector, "PassiveFollowGoal")) {
             mob.goalSelector.addGoal(2, new PassiveFollowGoal(mob));
         }
-        // Vagar devagar quando nao ha jogador por perto (0.5 x normal).
         if (!hasGoalByName(mob.goalSelector, "WaterAvoidingRandomStrollGoal")) {
             mob.goalSelector.addGoal(4, new WaterAvoidingRandomStrollGoal(mob, SPEED_WANDER));
         }
-        // Mantida: CustomHurtByTargetGoal -> ao apanhar, ela mira quem a atacou.
+    }
+
+    @SubscribeEvent
+    public static void onInteract(PlayerInteractEvent.EntityInteract event) {
+        if (event.getHand() != InteractionHand.MAIN_HAND) {
+            return; // processa so a mao principal (evita disparo duplo)
+        }
+        Entity target = event.getTarget();
+        if (!isJenny(target) || !(target instanceof PathfinderMob mob)) {
+            return;
+        }
+        CompoundTag data = target.getPersistentData();
+        if (!data.getBoolean(JennyAddon.TAG_PASSIVE)) {
+            return; // por enquanto, so a passiva e domesticavel
+        }
+        Player player = event.getEntity();
+
+        // Ja domesticada: o dono alterna entre seguir e sentar.
+        if (data.getBoolean(JennyAddon.TAG_TAMED)) {
+            if (isOwner(data, player)) {
+                event.setCanceled(true);
+                event.setCancellationResult(InteractionResult.SUCCESS);
+                if (!target.level().isClientSide()) {
+                    data.putBoolean(JennyAddon.TAG_SITTING, !data.getBoolean(JennyAddon.TAG_SITTING));
+                    mob.getNavigation().stop();
+                }
+            }
+            return;
+        }
+
+        // Ainda selvagem: tentar domesticar com o item na mao.
+        ItemStack held = event.getItemStack();
+        Double chance = TAME_ITEMS.get(held.getItem());
+        if (chance == null) {
+            return; // item nao serve para domesticar
+        }
+
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.SUCCESS);
+        if (target.level().isClientSide()) {
+            return; // logica e particulas so no servidor
+        }
+
+        if (!player.getAbilities().instabuild) {
+            held.shrink(1);
+        }
+
+        if (mob.getRandom().nextDouble() < chance) {
+            data.putBoolean(JennyAddon.TAG_TAMED, true);
+            data.putUUID(JennyAddon.TAG_OWNER, player.getUUID());
+            data.putBoolean(JennyAddon.TAG_SITTING, false);
+            mob.setPersistenceRequired();
+            mob.setTarget(null);
+            provoked.remove(mob.getId());
+            spawnParticles(mob, ParticleTypes.HEART);
+        } else {
+            spawnParticles(mob, ParticleTypes.SMOKE);
+        }
     }
 
     @SubscribeEvent
@@ -107,7 +176,7 @@ public final class PersonalityHandler {
         if (victim.level().isClientSide() || !isJenny(victim)) {
             return;
         }
-        if (!victim.getPersistentData().getBoolean(TAG_PASSIVE)) {
+        if (!victim.getPersistentData().getBoolean(JennyAddon.TAG_PASSIVE)) {
             return;
         }
         if (event.getSource().getEntity() instanceof Player) {
@@ -121,7 +190,7 @@ public final class PersonalityHandler {
         if (ent.level().isClientSide() || !(ent instanceof PathfinderMob mob) || !isJenny(ent)) {
             return;
         }
-        if (!ent.getPersistentData().getBoolean(TAG_PASSIVE)) {
+        if (!ent.getPersistentData().getBoolean(JennyAddon.TAG_PASSIVE)) {
             return;
         }
         Integer left = provoked.get(ent.getId());
@@ -129,7 +198,7 @@ public final class PersonalityHandler {
             left = left - 1;
             if (left <= 0) {
                 provoked.remove(ent.getId());
-                mob.setTarget(null); // acalmou: para de atacar e volta a seguir
+                mob.setTarget(null);
             } else {
                 provoked.put(ent.getId(), left);
             }
@@ -137,6 +206,22 @@ public final class PersonalityHandler {
     }
 
     // ---- utilitarios ----
+
+    private static boolean isOwner(CompoundTag data, Player player) {
+        return data.hasUUID(JennyAddon.TAG_OWNER)
+            && data.getUUID(JennyAddon.TAG_OWNER).equals(player.getUUID());
+    }
+
+    private static void spawnParticles(Entity e, ParticleOptions particle) {
+        if (!(e.level() instanceof ServerLevel sl)) {
+            return;
+        }
+        sl.sendParticles(particle,
+                e.getX(), e.getY() + e.getBbHeight() * 0.5D, e.getZ(),
+                7,
+                e.getBbWidth() * 0.5D, e.getBbHeight() * 0.5D, e.getBbWidth() * 0.5D,
+                0.05D);
+    }
 
     private static void removeGoalsByName(GoalSelector selector, String... simpleNames) {
         List<Goal> toRemove = new ArrayList<>();
