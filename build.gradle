@@ -1,6 +1,7 @@
 plugins {
     id 'eclipse'
     id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
+    id 'org.spongepowered.mixin' version '0.7.+'
 }
 
 version = '1.0.0'
@@ -19,6 +20,11 @@ minecraft {
     accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
 }
 
+mixin {
+    add sourceSets.main, 'jennyaddon.refmap.json'
+    config 'jennyaddon.mixins.json'
+}
+
 repositories {
 }
 
@@ -34,7 +40,8 @@ jar {
             'Specification-Version'  : '1',
             'Implementation-Title'   : project.name,
             'Implementation-Version' : project.version,
-            'Implementation-Vendor'  : 'eduol4'
+            'Implementation-Vendor'  : 'eduol4',
+            'MixinConfigs'           : 'jennyaddon.mixins.json'
         ])
     }
 }
