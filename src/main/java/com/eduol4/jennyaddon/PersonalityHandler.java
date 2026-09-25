@@ -137,15 +137,21 @@ public final class PersonalityHandler {
         // Ja domesticada: o dono alterna entre seguir e sentar.
         if (data.getBoolean(JennyAddon.TAG_TAMED)) {
             if (isOwner(data, player)) {
+                // Se o dono estiver com uma etiqueta (name tag), deixa o jogo renomear normalmente,
+                // em vez de interpretar o clique como comando de sentar/seguir.
+                if (event.getItemStack().getItem() == Items.NAME_TAG) {
+                    return;
+                }
                 event.setCanceled(true);
                 event.setCancellationResult(InteractionResult.SUCCESS);
                 if (!target.level().isClientSide()) {
                     boolean nowSitting = !data.getBoolean(JennyAddon.TAG_SITTING);
                     data.putBoolean(JennyAddon.TAG_SITTING, nowSitting);
                     mob.getNavigation().stop();
+                    String name = jennyName(target);
                     // Aviso na action bar (acima da hotbar), como o "voce nao pode dormir".
                     player.displayClientMessage(
-                        Component.literal(nowSitting ? "Jenny is now sitting!" : "Jenny is now following!"),
+                        Component.literal(name + (nowSitting ? " is now sitting!" : " is now following!")),
                         true
                     );
                 }
@@ -243,7 +249,17 @@ public final class PersonalityHandler {
         }
         Player owner = dead.level().getPlayerByUUID(data.getUUID(JennyAddon.TAG_OWNER));
         if (owner != null) {
-            owner.sendSystemMessage(Component.literal("Jenny has died!"));
+            String name = jennyName(dead);
+            Entity killer = event.getSource().getEntity();
+            Component msg;
+            if (killer != null) {
+                msg = Component.literal(name + " was slain by ")
+                        .append(killer.getDisplayName())
+                        .append(Component.literal("!"));
+            } else {
+                msg = Component.literal(name + " has died!");
+            }
+            owner.sendSystemMessage(msg);
         }
     }
 
@@ -269,6 +285,13 @@ public final class PersonalityHandler {
     }
 
     // ---- utilitarios ----
+
+    /** Nome para as mensagens: o nome da etiqueta, se houver; senao, "Jenny". */
+    private static String jennyName(Entity e) {
+        return e.hasCustomName() && e.getCustomName() != null
+            ? e.getCustomName().getString()
+            : "Jenny";
+    }
 
     private static boolean isOwner(CompoundTag data, Player player) {
         return data.hasUUID(JennyAddon.TAG_OWNER)
