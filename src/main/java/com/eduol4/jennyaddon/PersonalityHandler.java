@@ -3,6 +3,7 @@ package com.eduol4.jennyaddon;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
@@ -22,6 +23,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
@@ -138,8 +140,14 @@ public final class PersonalityHandler {
                 event.setCanceled(true);
                 event.setCancellationResult(InteractionResult.SUCCESS);
                 if (!target.level().isClientSide()) {
-                    data.putBoolean(JennyAddon.TAG_SITTING, !data.getBoolean(JennyAddon.TAG_SITTING));
+                    boolean nowSitting = !data.getBoolean(JennyAddon.TAG_SITTING);
+                    data.putBoolean(JennyAddon.TAG_SITTING, nowSitting);
                     mob.getNavigation().stop();
+                    // Aviso na action bar (acima da hotbar), como o "voce nao pode dormir".
+                    player.displayClientMessage(
+                        Component.literal(nowSitting ? "Jenny is now sitting!" : "Jenny is now following!"),
+                        true
+                    );
                 }
             }
             return;
@@ -220,6 +228,22 @@ public final class PersonalityHandler {
                 && isJenny(newTarget)
                 && newTarget.getPersistentData().getBoolean(JennyAddon.TAG_TAMED)) {
             event.setCanceled(true); // Golem nao ataca Jenny domada
+        }
+    }
+
+    @SubscribeEvent
+    public static void onDeath(LivingDeathEvent event) {
+        Entity dead = event.getEntity();
+        if (dead.level().isClientSide() || !isJenny(dead)) {
+            return;
+        }
+        CompoundTag data = dead.getPersistentData();
+        if (!data.getBoolean(JennyAddon.TAG_TAMED) || !data.hasUUID(JennyAddon.TAG_OWNER)) {
+            return;
+        }
+        Player owner = dead.level().getPlayerByUUID(data.getUUID(JennyAddon.TAG_OWNER));
+        if (owner != null) {
+            owner.sendSystemMessage(Component.literal("Jenny has died!"));
         }
     }
 
