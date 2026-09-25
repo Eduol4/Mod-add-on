@@ -1,11 +1,11 @@
-# Jenny Dweller Add-on
+# Dweller Add-on
 
-Mod-companheiro para o "Jenny Dweller" (Minecraft 1.20.1 / Forge 47.4.10).
+Mod-companheiro para um Mod (Minecraft 1.20.1 / Forge 47.4.10).
 Adiciona personalidade por spawn:
 
 - **80% passiva**: segue o jogador mais proximo mantendo distancia, sem atacar, sem "stare", sem fuga.
 - **20% normal**: comportamento padrao do mod, intacto.
-- Uma Jenny **passiva** atacada por um jogador **vira hostil** e se defende; volta a ser passiva
+- Uma Dweller **passiva** atacada por um jogador **vira hostil** e se defende; volta a ser passiva
   cerca de **25 segundos** apos o ultimo golpe.
 - A personalidade e **sorteada uma vez** por criatura e **salva** (sobrevive a recarregar o mundo).
 
