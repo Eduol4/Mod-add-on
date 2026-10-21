@@ -1,4 +1,4 @@
-# Dweller Add-on
+# Add-on
 
 Mod-companheiro para um Mod (Minecraft 1.20.1 / Forge 47.4.10).
 Adiciona personalidade por spawn:
